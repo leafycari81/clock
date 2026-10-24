@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<title>Stop the Clock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Nunito:wght@500;700;800&family=JetBrains+Mono:wght@600;800&display=swap">
+<style>
+/* Layout: one landscape screen for the projector — prompt, STOP and team scores on the left, a wall clock filling the full height on the right; no scrolling */
+:root {
+  --bg: #EEF1EC; --surface: #FFFFFF; --ink: #1D2B2A; --muted: #5C6B68; --line: #D3DAD5;
+  --face: #FBFCFA; --accent: #E4572E; --accent-ink: #FFFFFF; --past: #3B8F84; --to: #D9922E;
+  --past-soft: rgba(59,143,132,.13); --to-soft: rgba(217,146,46,.15); --second: #C0392B;
+  --good: #2E8B57; --close: #C98A12; --miss: #C0392B;
+  --font-display: "Bricolage Grotesque", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --font-body: "Nunito", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141B1A; --surface: #1D2725; --ink: #E8EEEA; --muted: #9AA9A5; --line: #33413E;
+  --face: #222D2B; --accent: #FF6A42; --accent-ink: #1A0E0A; --past: #5CC2B3; --to: #F2B45A;
+  --past-soft: rgba(92,194,179,.14); --to-soft: rgba(242,180,90,.14); --second: #FF6B5E;
+  --good: #4CC27F; --close: #F0B940; --miss: #FF6B5E; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141B1A; --surface: #1D2725; --ink: #E8EEEA; --muted: #9AA9A5; --line: #33413E;
+  --face: #222D2B; --accent: #FF6A42; --accent-ink: #1A0E0A; --past: #5CC2B3; --to: #F2B45A;
+  --past-soft: rgba(92,194,179,.14); --to-soft: rgba(242,180,90,.14); --second: #FF6B5E;
+  --good: #4CC27F; --close: #F0B940; --miss: #FF6B5E; color-scheme: dark }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; overflow: hidden; }
+.app { height: 100%; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(14px, 2.2vw, 32px);
+  padding-block: clamp(12px, 2.2vh, 24px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.left { position: relative; display: flex; flex-direction: column; gap: clamp(10px, 1.8vh, 18px); min-width: 0; min-height: 0; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(26px, 3.4vw, 46px); margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--accent); }
+.round { font-family: var(--font-mono); color: var(--muted); font-size: clamp(13px, 1.2vw, 17px); letter-spacing: .06em; }
+
+.target { flex: 1; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: clamp(14px, 2.4vh, 28px) clamp(16px, 2vw, 30px);
+  display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.label { font-size: clamp(12px, 1.1vw, 15px); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.target-words { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 4.4vw, 70px); line-height: 1.1; text-wrap: balance; }
+.target-sub { color: var(--muted); font-size: clamp(13px, 1.2vw, 16px); }
+
+.stop { width: 100%; border: 0; border-radius: 18px; background: var(--accent); color: var(--accent-ink);
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 3.6vw, 52px); padding: clamp(10px, 2vh, 20px); cursor: pointer;
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--accent) 60%, #000); transition: transform .08s, box-shadow .08s; }
+.stop:active { transform: translateY(4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 60%, #000); }
+.stop:disabled { opacity: .45; cursor: default; transform: none; }
+button:focus-visible, select:focus-visible { outline: 3px solid var(--past); outline-offset: 3px; }
+
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.team { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font: inherit; color: inherit; text-align: left; }
+.team.on { border-color: var(--accent); }
+.team .nm { font-weight: 800; font-size: clamp(15px, 1.4vw, 19px); }
+.team .nm small { display: block; font-weight: 700; font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+.team .sc { font-family: var(--font-mono); font-weight: 800; font-size: clamp(26px, 2.8vw, 38px); font-variant-numeric: tabular-nums; }
+
+.settings { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; }
+.settings label { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--muted); }
+select, .ghost { font: inherit; font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 4px 8px; }
+.ghost { cursor: pointer; }
+
+.clockbox { height: 100%; aspect-ratio: 1 / 1; max-width: 62vw; display: grid; place-items: center; min-height: 0; }
+svg.clock { width: 100%; height: 100%; display: block; }
+
+/* result popup — covers the left column so the clock (with the correct hand) stays visible */
+.popup { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.card { width: 100%; box-sizing: border-box; background: var(--surface); border: 3px solid var(--line); border-radius: 22px; padding: clamp(16px, 3vh, 30px) clamp(18px, 2.4vw, 32px);
+  display: grid; gap: clamp(8px, 1.6vh, 14px); box-shadow: 0 18px 40px rgba(0,0,0,.18); animation: pop .32s cubic-bezier(.2,1.4,.4,1); }
+.card.hit { border-color: var(--good); } .card.close { border-color: var(--close); } .card.miss { border-color: var(--miss); }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.verdict { font-family: var(--font-display); font-weight: 800; font-size: clamp(48px, 7vw, 96px); line-height: 1; }
+.verdict.hit { color: var(--good); } .verdict.close { color: var(--close); } .verdict.miss { color: var(--miss); }
+.pts { font-weight: 800; font-size: clamp(16px, 1.6vw, 22px); }
+.rows { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 74px 70px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.row b { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.row .t { font-family: var(--font-mono); font-weight: 800; font-size: clamp(16px, 1.6vw, 21px); font-variant-numeric: tabular-nums; }
+.row .w { font-weight: 700; font-size: clamp(15px, 1.5vw, 19px); }
+.rule { font-size: clamp(13px, 1.2vw, 15px); color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+.next { border: 0; border-radius: 14px; background: var(--ink); color: var(--bg); font-family: var(--font-display); font-weight: 800; font-size: clamp(20px, 2.2vw, 28px); padding: 10px; cursor: pointer; }
+
+/* start screen — unlocks sound */
+.start { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); }
+.start .card { max-width: 520px; text-align: center; justify-items: center; animation: none; }
+.start h2 { font-family: var(--font-display); font-size: clamp(30px, 4vw, 48px); margin: 0; }
+.start p { margin: 0; color: var(--muted); line-height: 1.6; }
+.go { border: 0; border-radius: 16px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 800; font-size: 28px; padding: 12px 40px; cursor: pointer; }
+
+/* portrait phones: stack and allow scroll */
+@media (max-aspect-ratio: 1/1) {
+  body { overflow: auto; }
+  .app { height: auto; grid-template-columns: 1fr; }
+  .clockbox { height: auto; width: 100%; max-width: 100%; order: -1; }
+  .target { flex: none; }
+}
+@media (prefers-reduced-motion: reduce) { .card { animation: none; } .stop { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="left">
+    <header>
+      <h1>Stop the <span>Clock</span></h1>
+      <div class="round" id="round">ROUND 1</div>
+    </header>
+
+    <div class="target">
+      <div class="label">Stop the clock at</div>
+      <div class="target-words" id="tWords">It's a quarter to five.</div>
+      <div class="target-sub">讀英文時間，在時鐘走到這個時間時按 STOP！（空白鍵也可以）</div>
+    </div>
+
+    <button class="stop" id="stopBtn" type="button">STOP!</button>
+
+    <div class="teams">
+      <button class="team on" id="teamA" type="button"><span class="nm">Team A<small>NOW PLAYING</small></span><span class="sc" id="scA">0</span></button>
+      <button class="team" id="teamB" type="button"><span class="nm">Team B<small>&nbsp;</small></span><span class="sc" id="scB">0</span></button>
+    </div>
+
+    <div class="settings">
+      <label for="level">分鐘 <select id="level"><option value="5">5 的倍數</option><option value="1">任意分鐘</option></select></label>
+      <label for="speed">速度 <select id="speed"><option value="1">慢</option><option value="1.6" selected>中</option><option value="2.6">快</option></select></label>
+      <label for="hint">past / to 提示 <select id="hint"><option value="on">顯示</option><option value="off">隱藏</option></select></label>
+      <label for="sound">音效 <select id="sound"><option value="on">開</option><option value="off">關</option></select></label>
+      <button class="ghost" id="reset" type="button">分數歸零</button>
+    </div>
+
+    <div class="popup" id="popup" hidden>
+      <div class="card" id="card">
+        <div class="verdict" id="verdict">HIT!</div>
+        <div class="pts" id="pts">+3 points</div>
+        <div class="rows">
+          <div class="row"><b>Target</b><span class="t" id="rT">4:45</span><span class="w" id="rTW">It's a quarter to five.</span></div>
+          <div class="row"><b>You</b><span class="t" id="rY">4:43</span><span class="w" id="rYW">It's seventeen minutes to five.</span></div>
+        </div>
+        <div class="rule" id="rule"></div>
+        <button class="next" id="nextBtn" type="button">NEXT →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="clockbox"><svg class="clock" id="clock" viewBox="0 0 400 400" role="img" aria-label="Analog clock"></svg></div>
+</div>
+
+<div class="start" id="start">
+  <div class="card">
+    <h2>Stop the Clock</h2>
+    <p>時鐘會開始走動，請讀題目的英文時間，<br>在時鐘走到那個時間時按下 STOP！</p>
+    <p>按下面的按鈕開始（會播放滴答聲和敲鑼聲）</p>
+    <button class="go" id="goBtn" type="button">START</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+  const ONES = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty'];
+  const num = (n) => n <= 20 ? ONES[n] : 'twenty-' + ONES[n - 20];
+  const hourOf = (h) => ONES[((h - 1 + 12) % 12) + 1];
+  const mins = (n) => num(n) + (n % 5 ? (n === 1 ? ' minute' : ' minutes') : '');
+  function english(h, m) {
+    if (m === 0) return `It's ${hourOf(h)} o'clock.`;
+    if (m === 15) return `It's a quarter past ${hourOf(h)}.`;
+    if (m === 30) return `It's half past ${hourOf(h)}.`;
+    if (m === 45) return `It's a quarter to ${hourOf(h + 1)}.`;
+    if (m < 30) return `It's ${mins(m)} past ${hourOf(h)}.`;
+    return `It's ${mins(60 - m)} to ${hourOf(h + 1)}.`;
+  }
+  const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
+  const split = (t) => { const tt = ((t % 720) + 720) % 720; const h = Math.floor(tt / 60); return [h === 0 ? 12 : h, tt % 60]; };
+
+  // ---------- sound (Web Audio, no files)
+  let ac = null, tickFlip = false;
+  const soundOn = () => ac && $('sound').value === 'on';
+  function tick() {
+    if (!soundOn()) return;
+    const t = ac.currentTime, len = 0.03;
+    const buf = ac.createBuffer(1, ac.sampleRate * len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = tickFlip ? 2600 : 3400; bp.Q.value = 6;
+    const g = ac.createGain(); g.gain.value = 0.9;
+    src.connect(bp).connect(g).connect(ac.destination); src.start(t);
+    tickFlip = !tickFlip;
+  }
+  function gong() {
+    if (!soundOn()) return;
+    const t = ac.currentTime, master = ac.createGain();
+    master.gain.setValueAtTime(0.0001, t); master.gain.exponentialRampToValueAtTime(0.55, t + 0.015); master.gain.exponentialRampToValueAtTime(0.0001, t + 4.5);
+    master.connect(ac.destination);
+    [[98, 1], [196.6, .55], [262, .4], [367, .3], [519, .2], [702, .12]].forEach(([f, a], i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f * 1.012, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.6);
+      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 4.5 - i * 0.5);
+      o.connect(g).connect(master); o.start(t); o.stop(t + 4.6);
+    });
+    const n = ac.createBufferSource(), nb = ac.createBuffer(1, ac.sampleRate * 0.08, ac.sampleRate), nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+    n.buffer = nb; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+    const ng = ac.createGain(); ng.gain.value = 0.5; n.connect(lp).connect(ng).connect(master); n.start(t);
+  }
+
+  // ---------- clock face
+  const svg = $('clock');
+  const el = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+  const C = 200, R = 188;
+  el('circle', { cx: C, cy: C, r: R + 8, fill: 'var(--ink)' });
+  el('circle', { cx: C, cy: C, r: R, fill: 'var(--face)' });
+  const hint = el('g', {});
+  el('path', { d: `M${C} ${C} L${C} ${C - R} A${R} ${R} 0 0 1 ${C} ${C + R} Z`, fill: 'var(--past-soft)' }, hint);
+  el('path', { d: `M${C} ${C} L${C} ${C + R} A${R} ${R} 0 0 1 ${C} ${C - R} Z`, fill: 'var(--to-soft)' }, hint);
+  const lbl = (x, txt, col) => { const t = el('text', { x, y: C + 50, 'text-anchor': 'middle', 'font-family': 'Nunito, sans-serif', 'font-weight': 800, 'font-size': 22, fill: col }, hint); t.textContent = txt; };
+  lbl(C + 88, 'past', 'var(--past)'); lbl(C - 88, 'to', 'var(--to)');
+  for (let i = 0; i < 60; i++) {
+    const a = i * 6 * Math.PI / 180, big = i % 5 === 0, r1 = R - (big ? 18 : 9), r2 = R - 3;
+    el('line', { x1: C + r1 * Math.sin(a), y1: C - r1 * Math.cos(a), x2: C + r2 * Math.sin(a), y2: C - r2 * Math.cos(a), stroke: 'var(--ink)', 'stroke-width': big ? 4 : 1.5, 'stroke-linecap': 'round' });
+  }
+  for (let n = 1; n <= 12; n++) {
+    const a = n * 30 * Math.PI / 180, r = R - 42;
+    el('text', { x: C + r * Math.sin(a), y: C - r * Math.cos(a) + 11, 'text-anchor': 'middle', 'font-family': 'Bricolage Grotesque, sans-serif', 'font-weight': 800, 'font-size': 32, fill: 'var(--ink)' }).textContent = n;
+  }
+  const targetMark = el('g', {});
+  const hourHand = el('line', { x1: C, y1: C + 16, x2: C, y2: C - 95, stroke: 'var(--ink)', 'stroke-width': 11, 'stroke-linecap': 'round' });
+  const minHand = el('line', { x1: C, y1: C + 22, x2: C, y2: C - 152, stroke: 'var(--accent)', 'stroke-width': 6, 'stroke-linecap': 'round' });
+  const secHand = el('line', { x1: C, y1: C + 30, x2: C, y2: C - 165, stroke: 'var(--second)', 'stroke-width': 2, 'stroke-linecap': 'round' });
+  el('circle', { cx: C, cy: C, r: 10, fill: 'var(--ink)' });
+  el('circle', { cx: C, cy: C, r: 4, fill: 'var(--second)' });
+
+  // ---------- game state
+  // S.t is clock time in minutes. The second hand sweeps one turn per clock minute; each time it passes 12 the minute hand ticks forward.
+  const S = { t: 0, target: 0, running: false, team: 0, scores: [0, 0], round: 1, last: performance.now() };
+
+  function draw() {
+    const whole = Math.floor(S.t), m = ((whole % 60) + 60) % 60, hm = ((whole % 720) + 720) % 720;
+    minHand.setAttribute('transform', `rotate(${m * 6} ${C} ${C})`);
+    hourHand.setAttribute('transform', `rotate(${hm * 0.5} ${C} ${C})`);
+    secHand.setAttribute('transform', `rotate(${(S.t - Math.floor(S.t)) * 360} ${C} ${C})`);
+  }
+
+  function newRound() {
+    const step = +$('level').value;
+    const h = 1 + Math.floor(Math.random() * 12), m = step * (1 + Math.floor(Math.random() * (60 / step - 1)));   // never :00
+    S.target = (h % 12) * 60 + m;
+    S.t = S.target - (15 + Math.floor(Math.random() * 30));   // start 15–45 minutes earlier
+    targetMark.innerHTML = '';
+    $('tWords').textContent = english(h, m);
+    $('popup').hidden = true;
+    $('stopBtn').disabled = false;
+    $('round').textContent = 'ROUND ' + S.round;
+    S.running = true;
+    draw();
+  }
+
+  function stop() {
+    if (!S.running) return;
+    S.running = false; gong();
+    $('stopBtn').disabled = true;
+    const stopped = ((Math.floor(S.t) % 720) + 720) % 720;
+    let diff = Math.abs(stopped - S.target); diff = Math.min(diff, 720 - diff);
+    const [th, tm] = split(S.target), [yh, ym] = split(stopped);
+    let pts = 0, cls = 'miss', head = 'MISSED!', sub = `差 ${diff} 分鐘，0 points`;
+    if (diff === 0) { pts = 3; cls = 'hit'; head = 'HIT!'; sub = '+3 points'; }
+    else if (diff <= 2) { pts = 1; cls = 'close'; head = 'MISSED!'; sub = `差 ${diff} 分鐘，好可惜！+1 point`; }
+    S.scores[S.team] += pts;
+    $('card').className = 'card ' + cls;
+    $('verdict').textContent = head; $('verdict').className = 'verdict ' + cls;
+    $('pts').textContent = sub;
+    $('rT').textContent = fmt(th, tm); $('rTW').textContent = english(th, tm);
+    $('rY').textContent = fmt(yh, ym); $('rYW').textContent = english(yh, ym);
+    $('rule').textContent = tm <= 30
+      ? `${tm} 分 → past：過了 ${hourOf(th)} 點 ${tm} 分（15 = a quarter，30 = half）`
+      : `${tm} 分 → to：再 ${60 - tm} 分鐘就到 ${hourOf(th + 1)} 點（45 = a quarter to）`;
+    el('line', { x1: C, y1: C, x2: C, y2: C - 152, stroke: 'var(--good)', 'stroke-width': 5, 'stroke-dasharray': '7 7', 'stroke-linecap': 'round', transform: `rotate(${tm * 6} ${C} ${C})` }, targetMark);
+    $('popup').hidden = false;
+    paintTeams();
+    $('nextBtn').focus({ preventScroll: true });
+  }
+
+  function next() { S.round++; S.team = 1 - S.team; paintTeams(); newRound(); $('stopBtn').focus({ preventScroll: true }); }
+
+  function paintTeams() {
+    $('scA').textContent = S.scores[0]; $('scB').textContent = S.scores[1];
+    ['teamA', 'teamB'].forEach((id, i) => {
+      $(id).classList.toggle('on', S.team === i);
+      $(id).querySelector('small').innerHTML = S.team === i ? 'NOW PLAYING' : '&nbsp;';
+    });
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.1, (now - S.last) / 1000); S.last = now;
+    if (S.running) {
+      const before = Math.floor(S.t);
+      S.t += dt * +$('speed').value;            // speed = clock minutes per real second
+      if (Math.floor(S.t) !== before) tick();
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  $('goBtn').addEventListener('click', () => {
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
+    $('start').hidden = true; newRound(); $('stopBtn').focus({ preventScroll: true });
+  });
+  $('stopBtn').addEventListener('click', stop);
+  $('nextBtn').addEventListener('click', next);
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || document.activeElement?.tagName === 'SELECT') return;
+    if (document.activeElement?.tagName === 'BUTTON' && document.activeElement !== $('stopBtn') && document.activeElement !== $('nextBtn')) return;
+    e.preventDefault();
+    if (!$('start').hidden) $('goBtn').click();
+    else if (S.running) stop();
+    else next();
+  });
+  $('teamA').addEventListener('click', () => { S.team = 0; paintTeams(); });
+  $('teamB').addEventListener('click', () => { S.team = 1; paintTeams(); });
+  $('level').addEventListener('change', () => { if (S.running) newRound(); });
+  $('hint').addEventListener('change', () => { hint.style.display = $('hint').value === 'on' ? '' : 'none'; });
+  $('reset').addEventListener('click', () => { S.scores = [0, 0]; S.round = 1; S.team = 0; paintTeams(); if (!$('start').hidden) return; newRound(); });
+
+  paintTeams(); draw(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
