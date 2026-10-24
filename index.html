@@ -171,13 +171,18 @@ svg.clock { width: 100%; height: 100%; display: block; }
   const mins = (n) => num(n) + (n % 5 ? (n === 1 ? ' minute' : ' minutes') : '');
   function english(h, m) {
     if (m === 0) return `It's ${hourOf(h)} o'clock.`;
-    if (m === 15) return `It's a quarter past ${hourOf(h)}.`;
+    if (m === 15) return `It's a quarter after ${hourOf(h)}.`;
     if (m === 30) return `It's half past ${hourOf(h)}.`;
     if (m === 45) return `It's a quarter to ${hourOf(h + 1)}.`;
     if (m < 30) return `It's ${mins(m)} past ${hourOf(h)}.`;
     return `It's ${mins(60 - m)} to ${hourOf(h + 1)}.`;
   }
   const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
+  // 順讀法: hour + minutes, e.g. It's eleven twenty. / It's nine oh five. / It's four forty-five.
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty'];
+  const minWord = (m) => m < 10 ? 'oh ' + ONES[m] : m <= 20 ? ONES[m] : TENS[Math.floor(m / 10)] + (m % 10 ? '-' + ONES[m % 10] : '');
+  const direct = (h, m) => `It's ${hourOf(h)} ${minWord(m)}.`;
+  const phrase = (h, m, style) => style === 'direct' ? direct(h, m) : english(h, m);
   const split = (t) => { const tt = ((t % 720) + 720) % 720; const h = Math.floor(tt / 60); return [h === 0 ? 12 : h, tt % 60]; };
 
   // ---------- sound (Web Audio, no files)
@@ -254,7 +259,8 @@ svg.clock { width: 100%; height: 100%; display: block; }
     S.target = (h % 12) * 60 + m;
     S.t = S.target - (15 + Math.floor(Math.random() * 30));   // start 15–45 minutes earlier
     targetMark.innerHTML = '';
-    $('tWords').textContent = english(h, m);
+    S.style = Math.random() < 1 / 6 ? 'direct' : 'reverse';   // 順讀 : 逆讀 ≈ 1 : 5
+    $('tWords').textContent = phrase(h, m, S.style);
     $('popup').hidden = true;
     $('stopBtn').disabled = false;
     $('round').textContent = 'ROUND ' + S.round;
@@ -276,10 +282,12 @@ svg.clock { width: 100%; height: 100%; display: block; }
     $('card').className = 'card ' + cls;
     $('verdict').textContent = head; $('verdict').className = 'verdict ' + cls;
     $('pts').textContent = sub;
-    $('rT').textContent = fmt(th, tm); $('rTW').textContent = english(th, tm);
-    $('rY').textContent = fmt(yh, ym); $('rYW').textContent = english(yh, ym);
-    $('rule').textContent = tm <= 30
-      ? `${tm} 分 → past：過了 ${hourOf(th)} 點 ${tm} 分（15 = a quarter，30 = half）`
+    $('rT').textContent = fmt(th, tm); $('rTW').textContent = phrase(th, tm, S.style);
+    $('rY').textContent = fmt(yh, ym); $('rYW').textContent = phrase(yh, ym, S.style);
+    $('rule').textContent = S.style === 'direct'
+      ? `順讀：直接說「幾點 ＋ 幾分」。逆讀的說法是：${english(th, tm)}`
+      : tm <= 30
+      ? `${tm} 分 → past：過了 ${hourOf(th)} 點 ${tm} 分（15 = a quarter after，30 = half past）`
       : `${tm} 分 → to：再 ${60 - tm} 分鐘就到 ${hourOf(th + 1)} 點（45 = a quarter to）`;
     el('line', { x1: C, y1: C, x2: C, y2: C - 152, stroke: 'var(--good)', 'stroke-width': 5, 'stroke-dasharray': '7 7', 'stroke-linecap': 'round', transform: `rotate(${tm * 6} ${C} ${C})` }, targetMark);
     $('popup').hidden = false;
